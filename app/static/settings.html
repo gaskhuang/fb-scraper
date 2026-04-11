@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>設定 — Facebook 社團爬蟲</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232730;
+    --border: #2e3340;
+    --text: #e4e6eb;
+    --text2: #8b8fa3;
+    --accent: #4f8cff;
+    --accent2: #3a6fd8;
+    --green: #34c759;
+    --red: #ff453a;
+    --orange: #ff9f0a;
+    --radius: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  .container { max-width: 900px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 32px; }
+  header h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+  header p { color: var(--text2); font-size: 14px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .card h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text2);
+    margin-bottom: 6px;
+  }
+
+  .form-group input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .form-group input:focus {
+    border-color: var(--accent);
+  }
+
+  .form-group input::placeholder {
+    color: var(--text2);
+    opacity: 0.6;
+  }
+
+  .form-group .hint {
+    font-size: 12px;
+    color: var(--text2);
+    margin-top: 4px;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .detect-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    margin-top: 4px;
+    padding: 2px 8px;
+    border-radius: 6px;
+  }
+
+  .detect-status.success {
+    background: rgba(52, 199, 89, 0.15);
+    color: var(--green);
+  }
+
+  .detect-status.warning {
+    background: rgba(255, 159, 10, 0.15);
+    color: var(--orange);
+  }
+
+  .detect-status.error {
+    background: rgba(255, 69, 58, 0.15);
+    color: var(--red);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .btn-primary:hover {
+    background: var(--accent2);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover {
+    background: var(--border);
+  }
+
+  .actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 1000;
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s ease;
+  }
+
+  .toast.show {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  .toast.success {
+    background: var(--green);
+    color: #fff;
+  }
+
+  .toast.error {
+    background: var(--red);
+    color: #fff;
+  }
+
+  .section-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 20px 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Facebook 社團爬蟲</h1>
+    <p>cdp-cli 驅動 · 模擬真人瀏覽行為 · 支援多社團批次爬取</p>
+    <div style="display:flex;justify-content:center;gap:8px;margin-top:16px">
+      <a href="/" style="padding:8px 20px;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:8px;text-decoration:none;font-size:14px;font-weight:600">一次性爬取</a>
+      <a href="/scheduler" style="padding:8px 20px;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:8px;text-decoration:none;font-size:14px;font-weight:600">排程爬取</a>
+      <a href="/settings" style="padding:8px 20px;background:var(--accent);color:#fff;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600">設定</a>
+    </div>
+  </header>
+
+  <!-- Telegram 設定 -->
+  <div class="card">
+    <h2>📨 Telegram 通知</h2>
+    <div class="form-group">
+      <label>Bot Token</label>
+      <input type="text" id="telegram_bot_token" placeholder="輸入 Telegram Bot Token (從 @BotFather 取得)">
+      <div class="hint">格式: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz</div>
+    </div>
+    <div class="form-group">
+      <label>Chat ID <span style="font-weight:400;color:var(--text2)">(自動偵測)</span></label>
+      <input type="text" id="telegram_chat_id" placeholder="儲存 Bot Token 後自動偵測">
+      <div class="hint">偵測前請先在 Telegram 對你的 Bot 發送 /start</div>
+      <div id="telegram-detect-status"></div>
+    </div>
+  </div>
+
+  <!-- GitHub 設定 -->
+  <div class="card">
+    <h2>🐙 GitHub Pages 發布</h2>
+    <div class="form-group">
+      <label>GitHub Personal Access Token</label>
+      <input type="text" id="github_token" placeholder="輸入 GitHub Token (需要 repo 權限)">
+      <div class="hint">到 GitHub → Settings → Developer settings → Personal access tokens 建立</div>
+    </div>
+    <div class="form-group">
+      <label>GitHub Repo <span style="font-weight:400;color:var(--text2)">(自動產生)</span></label>
+      <input type="text" id="github_repo" placeholder="儲存 Token 後自動建立 {username}/fb-reports">
+      <div id="github-detect-status"></div>
+    </div>
+  </div>
+
+  <!-- 進階設定 -->
+  <div class="card">
+    <h2>⚙️ 進階設定</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Chrome CDP Port</label>
+        <input type="number" id="cdp_port" value="9223" min="1024" max="65535">
+        <div class="hint">Chrome 遠端偵錯埠，預設 9223</div>
+      </div>
+      <div class="form-group">
+        <label>Web UI Port</label>
+        <input type="number" id="web_port" value="9558" min="1024" max="65535">
+        <div class="hint">FastAPI 服務埠，預設 9558（重啟後生效）</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 操作按鈕 -->
+  <div class="actions">
+    <button class="btn btn-primary" id="btn-save" onclick="saveConfig()">💾 儲存設定</button>
+    <button class="btn btn-secondary" onclick="testTelegram()">📨 測試 Telegram</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const fields = ['telegram_bot_token', 'telegram_chat_id', 'github_repo', 'github_token', 'cdp_port', 'web_port'];
+
+async function loadConfig() {
+  try {
+    const resp = await fetch('/api/config');
+    const cfg = await resp.json();
+    fields.forEach(f => {
+      const el = document.getElementById(f);
+      if (el && cfg[f] !== undefined && cfg[f] !== null) {
+        el.value = cfg[f];
+      }
+    });
+  } catch (e) {
+    showToast('載入設定失敗: ' + e.message, 'error');
+  }
+}
+
+async function saveConfig() {
+  const btn = document.getElementById('btn-save');
+  btn.disabled = true;
+  btn.textContent = '儲存中...';
+
+  const data = {};
+  fields.forEach(f => {
+    const el = document.getElementById(f);
+    if (f === 'cdp_port' || f === 'web_port') {
+      data[f] = parseInt(el.value) || (f === 'cdp_port' ? 9223 : 9558);
+    } else {
+      data[f] = el.value.trim();
+    }
+  });
+
+  try {
+    const resp = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await resp.json();
+
+    if (result.github_repo_detected) {
+      document.getElementById('github_repo').value = result.github_repo_detected;
+      showDetectStatus('github-detect-status', 'success', '✅ 已自動建立: ' + result.github_repo_detected);
+    }
+    if (result.github_error) {
+      showDetectStatus('github-detect-status', 'error', '❌ ' + result.github_error);
+    }
+
+    if (result.telegram_chat_id_detected) {
+      document.getElementById('telegram_chat_id').value = result.telegram_chat_id_detected;
+      showDetectStatus('telegram-detect-status', 'success', '✅ 已偵測 Chat ID: ' + result.telegram_chat_id_detected);
+    }
+    if (result.telegram_warning) {
+      showDetectStatus('telegram-detect-status', 'warning', '⚠️ ' + result.telegram_warning);
+    }
+    if (result.telegram_error) {
+      showDetectStatus('telegram-detect-status', 'error', '❌ ' + result.telegram_error);
+    }
+
+    // 更新遮罩 token
+    if (result.config) {
+      ['telegram_bot_token', 'github_token'].forEach(k => {
+        if (result.config[k]) {
+          document.getElementById(k).value = result.config[k];
+        }
+      });
+    }
+
+    showToast('設定已儲存', 'success');
+  } catch (e) {
+    showToast('儲存失敗: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 儲存設定';
+  }
+}
+
+async function testTelegram() {
+  try {
+    const resp = await fetch('/api/config/test-telegram', { method: 'POST' });
+    const result = await resp.json();
+    if (result.ok) {
+      showToast('Telegram 測試訊息已發送！', 'success');
+    } else {
+      showToast('發送失敗: ' + (result.error || '未知錯誤'), 'error');
+    }
+  } catch (e) {
+    showToast('測試失敗: ' + e.message, 'error');
+  }
+}
+
+function showDetectStatus(elementId, type, text) {
+  const el = document.getElementById(elementId);
+  el.innerHTML = '<span class="detect-status ' + type + '">' + text + '</span>';
+}
+
+function showToast(msg, type) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.className = 'toast ' + type + ' show';
+  setTimeout(() => { toast.className = 'toast'; }, 3000);
+}
+
+loadConfig();
+</script>
+</body>
+</html>

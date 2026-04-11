@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facebook 社團爬蟲 — 排程</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232730;
+    --border: #2e3340;
+    --text: #e4e6eb;
+    --text2: #8b8fa3;
+    --accent: #4f8cff;
+    --accent2: #3a6fd8;
+    --green: #34c759;
+    --red: #ff453a;
+    --orange: #ff9f0a;
+    --radius: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  .container { max-width: 900px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 32px; }
+  header h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+  header p { color: var(--text2); font-size: 14px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .card-header h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text2);
+    letter-spacing: 0.5px;
+  }
+
+  /* ── 排程列表卡片 ── */
+  .schedule-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 10px;
+    transition: border-color 0.2s;
+  }
+
+  .schedule-card:hover { border-color: var(--accent); }
+  .schedule-card.editing { border-color: var(--accent); background: rgba(79,140,255,0.05); }
+
+  .schedule-card-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .schedule-status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-top: 4px;
+    flex-shrink: 0;
+  }
+
+  .schedule-status-dot.active { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .schedule-status-dot.inactive { background: var(--text2); }
+
+  .schedule-card-info { flex: 1; min-width: 0; }
+
+  .schedule-card-name {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .schedule-card-groups {
+    font-size: 12px;
+    color: var(--text2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 6px;
+  }
+
+  .schedule-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 12px;
+  }
+
+  .meta-item { color: var(--text2); }
+  .meta-item strong { color: var(--text); font-weight: 500; }
+  .meta-item .ok { color: var(--green); }
+  .meta-item .fail { color: var(--red); }
+  .meta-item .pending { color: var(--text2); }
+
+  .schedule-card-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+
+  .btn-xs {
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text2);
+    transition: all 0.15s;
+  }
+
+  .btn-xs:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-xs.danger:hover { border-color: var(--red); color: var(--red); }
+  .btn-xs.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-xs.primary:hover { background: var(--accent2); }
+
+  /* ── 社團列表 ── */
+  #groups-list { display: flex; flex-direction: column; gap: 12px; }
+
+  .group-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .group-item .group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .group-item .group-label { font-size: 13px; font-weight: 600; color: var(--accent); }
+
+  .btn-remove {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text2);
+    font-size: 12px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-remove:hover { border-color: var(--red); color: var(--red); }
+
+  .group-url-row { margin-bottom: 12px; }
+
+  .group-url-row input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .group-url-row input:focus { border-color: var(--accent); }
+
+  .group-filters {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+    gap: 8px;
+  }
+
+  .filter-field label {
+    display: block;
+    font-size: 11px;
+    color: var(--text2);
+    margin-bottom: 4px;
+  }
+
+  .filter-field input,
+  .filter-field select {
+    width: 100%;
+    padding: 7px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+  }
+
+  .time-mini { display: flex; gap: 4px; }
+  .time-mini input { flex: 1; min-width: 0; }
+  .time-mini select { width: 62px; flex-shrink: 0; }
+
+  /* ── 排程時段設定 ── */
+  .schedule-section { margin-bottom: 20px; }
+
+  .schedule-section label.section-label {
+    display: block;
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 10px;
+    font-weight: 500;
+  }
+
+  .hour-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 4px;
+  }
+
+  .hour-chip { position: relative; }
+  .hour-chip input[type="checkbox"] { display: none; }
+  .hour-chip label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 36px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 0;
+    user-select: none;
+  }
+  .hour-chip input:checked + label { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .hour-chip label:hover { border-color: var(--accent); color: var(--accent); }
+
+  .weekday-row { display: flex; gap: 6px; }
+  .day-chip { position: relative; flex: 1; }
+  .day-chip input[type="checkbox"] { display: none; }
+  .day-chip label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 40px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 0;
+    user-select: none;
+  }
+  .day-chip input:checked + label { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .day-chip label:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── 全域設定 ── */
+  .global-settings {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .form-row { margin-bottom: 0; }
+
+  label {
+    display: block;
+    font-size: 14px;
+    color: var(--text2);
+    margin-bottom: 6px;
+  }
+
+  input[type="number"], input[type="text"] {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input[type="number"]:focus, input[type="text"]:focus { border-color: var(--accent); }
+
+  .hint { font-size: 12px; color: var(--text2); margin-top: 4px; }
+
+  /* ── 開關 ── */
+  .toggle-row { display: flex; align-items: center; gap: 10px; }
+  .toggle-row label { margin-bottom: 0; font-size: 14px; }
+  .toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+  .toggle input { display: none; }
+  .toggle .slider {
+    position: absolute;
+    inset: 0;
+    background: var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle .slider::before {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 20px; height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .toggle input:checked + .slider { background: var(--accent); }
+  .toggle input:checked + .slider::before { transform: translateX(20px); }
+
+  /* ── 按鈕 ── */
+  .btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-add {
+    background: var(--surface2);
+    border: 1px dashed var(--border);
+    color: var(--text2);
+    width: 100%;
+    margin-top: 4px;
+    padding: 10px;
+    font-size: 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-add:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-primary { background: var(--accent); color: white; width: 100%; }
+  .btn-primary:hover { background: var(--accent2); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: var(--surface2); border: 1px solid var(--border); color: var(--text); width: 100%; margin-top: 8px; }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { background: var(--red); color: white; width: 100%; margin-top: 8px; }
+  .btn-danger:hover { opacity: 0.85; }
+
+  .action-row { display: flex; gap: 8px; margin-top: 8px; }
+  .action-row .btn { width: auto; flex: 1; }
+
+  /* ── 日誌 ── */
+  #log-box {
+    background: #0a0c10;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    height: 320px;
+    overflow-y: auto;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #c0c4d0;
+  }
+
+  #log-box:empty::before { content: '等待排程執行...'; color: var(--text2); }
+
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border-radius: 8px;
+    margin-top: 12px;
+    font-size: 14px;
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 8px;
+  }
+
+  .status-dot.idle { background: var(--text2); }
+  .status-dot.running { background: var(--orange); animation: pulse 1.5s infinite; }
+  .status-dot.completed { background: var(--green); }
+  .status-dot.stopped { background: var(--orange); }
+  .status-dot.failed { background: var(--red); }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .report-link-card {
+    display: none;
+    margin-top: 12px;
+    padding: 16px;
+    background: rgba(79,140,255,0.1);
+    border: 1px solid rgba(79,140,255,0.3);
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  .report-link-card a { color: var(--accent); font-size: 15px; font-weight: 600; text-decoration: none; }
+  .report-link-card a:hover { text-decoration: underline; }
+
+  .empty-state {
+    text-align: center;
+    padding: 32px;
+    color: var(--text2);
+    font-size: 14px;
+  }
+
+  .form-name-row { margin-bottom: 16px; }
+  .form-name-row input { font-family: inherit; }
+
+  #editing-badge {
+    display: none;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--accent);
+    background: rgba(79,140,255,0.15);
+    padding: 2px 10px;
+    border-radius: 8px;
+    margin-left: 8px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Facebook 社團爬蟲</h1>
+    <p>cdp-cli 驅動 · 模擬真人瀏覽行為 · 支援多社團批次爬取</p>
+    <div style="display:flex;justify-content:center;gap:8px;margin-top:16px">
+      <a href="/" style="padding:8px 20px;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:8px;text-decoration:none;font-size:14px;font-weight:600">一次性爬取</a>
+      <a href="/scheduler" style="padding:8px 20px;background:var(--accent);color:#fff;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600">排程爬取</a>
+      <a href="/settings" style="padding:8px 20px;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:8px;text-decoration:none;font-size:14px;font-weight:600">設定</a>
+    </div>
+  </header>
+
+  <!-- 已存在的排程列表 -->
+  <div class="card">
+    <div class="card-header">
+      <h2>排程列表</h2>
+      <button class="btn-xs primary" onclick="newScheduleForm()">＋ 新增排程</button>
+    </div>
+    <div id="schedules-list">
+      <div class="empty-state">尚無排程，點「新增排程」開始設定</div>
+    </div>
+  </div>
+
+  <!-- 新增/編輯排程表單 -->
+  <div class="card" id="form-card" style="display:none">
+    <div class="card-header">
+      <h2 style="display:flex;align-items:center">
+        <span id="form-title">新增排程</span>
+        <span id="editing-badge">編輯中</span>
+      </h2>
+    </div>
+
+    <input type="hidden" id="editing-schedule-id" value="">
+
+    <!-- 排程名稱 -->
+    <div class="form-name-row">
+      <label>排程名稱（選填）</label>
+      <input type="text" id="schedule-name" placeholder="例如：科技社團早報、創業社群週報...">
+    </div>
+
+    <!-- 社團列表 -->
+    <div class="card-header" style="margin-bottom:12px">
+      <span style="font-size:14px;color:var(--text2);font-weight:600">社團列表</span>
+      <span id="group-count-label" style="font-size:13px;color:var(--text2)">共 0 個社團</span>
+    </div>
+    <div id="groups-list"></div>
+    <button class="btn-add" onclick="addGroup()">＋ 新增社團</button>
+
+    <!-- 排程時段 -->
+    <div style="margin-top:20px">
+      <div class="schedule-section">
+        <label class="section-label">執行星期（未選表示每天）</label>
+        <div class="weekday-row">
+          <div class="day-chip"><input type="checkbox" id="wd0"><label for="wd0">週一</label></div>
+          <div class="day-chip"><input type="checkbox" id="wd1"><label for="wd1">週二</label></div>
+          <div class="day-chip"><input type="checkbox" id="wd2"><label for="wd2">週三</label></div>
+          <div class="day-chip"><input type="checkbox" id="wd3"><label for="wd3">週四</label></div>
+          <div class="day-chip"><input type="checkbox" id="wd4"><label for="wd4">週五</label></div>
+          <div class="day-chip"><input type="checkbox" id="wd5"><label for="wd5">週六</label></div>
+          <div class="day-chip"><input type="checkbox" id="wd6"><label for="wd6">週日</label></div>
+        </div>
+      </div>
+
+      <div class="schedule-section" style="margin-bottom:0">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <label class="section-label" style="margin-bottom:0">執行時段（可多選，整點觸發）</label>
+          <button onclick="toggleAllHours()" id="btn-all-hours" style="background:var(--surface2);border:1px solid var(--border);color:var(--text2);font-size:12px;padding:4px 12px;border-radius:6px;cursor:pointer">全選</button>
+        </div>
+        <div class="hour-grid">
+          <div class="hour-chip"><input type="checkbox" id="h0"><label for="h0">0</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h1"><label for="h1">1</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h2"><label for="h2">2</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h3"><label for="h3">3</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h4"><label for="h4">4</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h5"><label for="h5">5</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h6"><label for="h6">6</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h7"><label for="h7">7</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h8"><label for="h8">8</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h9"><label for="h9">9</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h10"><label for="h10">10</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h11"><label for="h11">11</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h12"><label for="h12">12</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h13"><label for="h13">13</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h14"><label for="h14">14</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h15"><label for="h15">15</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h16"><label for="h16">16</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h17"><label for="h17">17</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h18"><label for="h18">18</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h19"><label for="h19">19</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h20"><label for="h20">20</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h21"><label for="h21">21</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h22"><label for="h22">22</label></div>
+          <div class="hour-chip"><input type="checkbox" id="h23"><label for="h23">23</label></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 全域設定 -->
+    <div class="global-settings" style="margin-top:20px">
+      <div class="form-row">
+        <label for="max-rounds">最大滾動輪數</label>
+        <input type="number" id="max-rounds" value="20" min="1">
+        <div class="hint">每輪隨機滾動 3–6 次</div>
+      </div>
+      <div class="form-row">
+        <label>爬完自動發布</label>
+        <div class="toggle-row">
+          <label class="toggle">
+            <input type="checkbox" id="auto-publish" checked>
+            <span class="slider"></span>
+          </label>
+          <span style="font-size:13px;color:var(--text2)">推送到 GitHub Pages</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 操作按鈕 -->
+    <div style="margin-top:20px">
+      <button class="btn btn-primary" id="btn-save" onclick="saveSchedule()">💾 儲存排程</button>
+      <div class="action-row">
+        <button class="btn btn-secondary" id="btn-run-now" onclick="runNow()">▶ 立即執行</button>
+        <button class="btn btn-secondary" id="btn-cancel-edit" onclick="cancelEdit()" style="display:none">取消編輯</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 日誌 -->
+  <div class="card" id="log-card" style="display:none">
+    <h2 style="font-size:16px;font-weight:600;color:var(--text2);margin-bottom:16px">
+      執行紀錄
+      <span id="log-schedule-name" style="font-weight:400;font-size:13px;color:var(--accent)"></span>
+    </h2>
+    <pre id="log-box"></pre>
+    <div class="status-bar">
+      <span>
+        <span class="status-dot idle" id="job-status-dot"></span>
+        <span id="job-status-text">閒置</span>
+      </span>
+      <span id="stats-text"></span>
+    </div>
+    <div class="report-link-card" id="report-link-card">
+      <div>📊 <a id="report-link" href="#" target="_blank">開啟線上報告</a></div>
+      <div style="font-size:12px;color:var(--text2);margin-top:6px" id="report-url-text"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let groupCounter = 0;
+let currentJobId = null;
+let evtSource = null;
+let schedulePoll = null;
+let runningScheduleId = null;
+
+// ── 社團管理 ──────────────────────────────────
+
+function addGroup(data) {
+  groupCounter++;
+  const id = `g${groupCounter}`;
+  const d = data || {};
+
+  const item = document.createElement('div');
+  item.className = 'group-item';
+  item.id = id;
+  item.innerHTML = `
+    <div class="group-header">
+      <span class="group-label">社團 #${groupCounter}</span>
+      <button class="btn-remove" onclick="removeGroup('${id}')">移除</button>
+    </div>
+    <div class="group-url-row">
+      <input type="text" class="g-url" placeholder="https://www.facebook.com/groups/..." value="${d.url || ''}">
+    </div>
+    <div class="group-filters">
+      <div class="filter-field">
+        <label>時間範圍</label>
+        <div class="time-mini">
+          <input type="number" class="g-time-val" placeholder="24" value="${d.timeVal || ''}">
+          <select class="g-time-unit">
+            <option value="h" ${(d.timeUnit||'h')==='h'?'selected':''}>小時</option>
+            <option value="d" ${(d.timeUnit||'')==='d'?'selected':''}>天</option>
+            <option value="w" ${(d.timeUnit||'')==='w'?'selected':''}>週</option>
+          </select>
+        </div>
+      </div>
+      <div class="filter-field">
+        <label>最多篇數</label>
+        <input type="number" class="g-top-n" value="${d.topN ?? 0}" min="0">
+      </div>
+      <div class="filter-field">
+        <label>最低讚數</label>
+        <input type="number" class="g-likes" value="${d.minLikes ?? 0}" min="0">
+      </div>
+      <div class="filter-field">
+        <label>最低留言</label>
+        <input type="number" class="g-comments" value="${d.minComments ?? 0}" min="0">
+      </div>
+      <div class="filter-field">
+        <label>最低分享</label>
+        <input type="number" class="g-shares" value="${d.minShares ?? 0}" min="0">
+      </div>
+    </div>
+  `;
+
+  document.getElementById('groups-list').appendChild(item);
+  updateGroupCountLabel();
+}
+
+function removeGroup(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+  updateGroupCountLabel();
+}
+
+function updateGroupCountLabel() {
+  const count = document.querySelectorAll('.group-item').length;
+  document.getElementById('group-count-label').textContent = `共 ${count} 個社團`;
+}
+
+function getGroupConfigs() {
+  return Array.from(document.querySelectorAll('.group-item')).map(item => {
+    const timeVal = item.querySelector('.g-time-val').value.trim();
+    const timeUnit = item.querySelector('.g-time-unit').value;
+    return {
+      group_url: item.querySelector('.g-url').value.trim(),
+      top_n: parseInt(item.querySelector('.g-top-n').value) || 0,
+      min_likes: parseInt(item.querySelector('.g-likes').value) || 0,
+      min_comments: parseInt(item.querySelector('.g-comments').value) || 0,
+      min_shares: parseInt(item.querySelector('.g-shares').value) || 0,
+      within: timeVal ? `${timeVal}${timeUnit}` : '',
+    };
+  });
+}
+
+// ── 時段選擇 ──────────────────────────────────
+
+function toggleAllHours() {
+  const allChecked = Array.from({length: 24}, (_, i) => document.getElementById(`h${i}`).checked).every(Boolean);
+  const btn = document.getElementById('btn-all-hours');
+  for (let i = 0; i < 24; i++) document.getElementById(`h${i}`).checked = !allChecked;
+  btn.textContent = allChecked ? '全選' : '取消全選';
+  btn.style.color = allChecked ? 'var(--text2)' : 'var(--accent)';
+  btn.style.borderColor = allChecked ? 'var(--border)' : 'var(--accent)';
+}
+
+function getSelectedHours() {
+  return Array.from({length: 24}, (_, i) => i).filter(i => document.getElementById(`h${i}`).checked);
+}
+
+function getSelectedWeekdays() {
+  return Array.from({length: 7}, (_, i) => i).filter(i => document.getElementById(`wd${i}`).checked);
+}
+
+// ── 表單操作 ──────────────────────────────────
+
+function newScheduleForm() {
+  // 清空表單
+  document.getElementById('editing-schedule-id').value = '';
+  document.getElementById('schedule-name').value = '';
+  document.getElementById('groups-list').innerHTML = '';
+  groupCounter = 0;
+  for (let i = 0; i < 24; i++) document.getElementById(`h${i}`).checked = (i === 8);
+  for (let i = 0; i < 7; i++) document.getElementById(`wd${i}`).checked = false;
+  document.getElementById('max-rounds').value = 20;
+  document.getElementById('auto-publish').checked = true;
+
+  addGroup();
+  updateGroupCountLabel();
+
+  document.getElementById('form-title').textContent = '新增排程';
+  document.getElementById('editing-badge').style.display = 'none';
+  document.getElementById('btn-cancel-edit').style.display = 'none';
+  document.getElementById('form-card').style.display = 'block';
+  document.getElementById('form-card').scrollIntoView({ behavior: 'smooth' });
+
+  // 清除所有編輯中高亮
+  document.querySelectorAll('.schedule-card.editing').forEach(c => c.classList.remove('editing'));
+}
+
+function editSchedule(sid) {
+  const s = window._schedules?.find(x => x.schedule_id === sid);
+  if (!s) return;
+
+  document.getElementById('editing-schedule-id').value = sid;
+  document.getElementById('schedule-name').value = s.name || '';
+
+  // 填入社團
+  document.getElementById('groups-list').innerHTML = '';
+  groupCounter = 0;
+  (s.groups || []).forEach(g => {
+    const within = g.within || '';
+    const m = within.match(/^(\d+)([hdw])$/);
+    addGroup({ url: g.group_url, timeVal: m?.[1]||'', timeUnit: m?.[2]||'h',
+               topN: g.top_n, minLikes: g.min_likes, minComments: g.min_comments, minShares: g.min_shares });
+  });
+  updateGroupCountLabel();
+
+  // 時段
+  for (let i = 0; i < 24; i++) document.getElementById(`h${i}`).checked = (s.hours||[]).includes(i);
+  for (let i = 0; i < 7; i++) document.getElementById(`wd${i}`).checked = (s.weekdays||[]).includes(i);
+  document.getElementById('max-rounds').value = s.max_rounds ?? 20;
+  document.getElementById('auto-publish').checked = s.auto_publish !== false;
+
+  document.getElementById('form-title').textContent = '編輯排程';
+  document.getElementById('editing-badge').style.display = 'inline';
+  document.getElementById('btn-cancel-edit').style.display = 'block';
+  document.getElementById('form-card').style.display = 'block';
+  document.getElementById('form-card').scrollIntoView({ behavior: 'smooth' });
+
+  // 高亮正在編輯的排程卡片
+  document.querySelectorAll('.schedule-card').forEach(c => c.classList.remove('editing'));
+  const card = document.getElementById(`sc-${sid}`);
+  if (card) card.classList.add('editing');
+}
+
+function cancelEdit() {
+  document.getElementById('editing-schedule-id').value = '';
+  document.getElementById('editing-badge').style.display = 'none';
+  document.getElementById('btn-cancel-edit').style.display = 'none';
+  document.getElementById('form-title').textContent = '新增排程';
+  document.querySelectorAll('.schedule-card.editing').forEach(c => c.classList.remove('editing'));
+}
+
+// ── 排程 CRUD ──────────────────────────────────
+
+async function saveSchedule() {
+  const groups = getGroupConfigs();
+  const hours = getSelectedHours();
+  const weekdays = getSelectedWeekdays();
+
+  if (groups.length === 0 || groups.some(g => !g.group_url)) {
+    alert('請填入至少一個社團網址');
+    return;
+  }
+  if (hours.length === 0) {
+    alert('請至少選擇一個執行時段');
+    return;
+  }
+
+  const sid = document.getElementById('editing-schedule-id').value;
+  const payload = {
+    schedule_id: sid || '',
+    name: document.getElementById('schedule-name').value.trim(),
+    groups,
+    hours,
+    weekdays,
+    max_rounds: parseInt(document.getElementById('max-rounds').value) || 20,
+    auto_publish: document.getElementById('auto-publish').checked,
+  };
+
+  const btn = document.getElementById('btn-save');
+  btn.disabled = true;
+  btn.textContent = '儲存中...';
+
+  try {
+    const resp = await fetch('/api/schedules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok) { alert(data.detail || '儲存失敗'); return; }
+
+    // 若新增，填入回傳的 schedule_id
+    document.getElementById('editing-schedule-id').value = data.schedule_id;
+    document.getElementById('form-title').textContent = '編輯排程';
+    document.getElementById('editing-badge').style.display = 'inline';
+    document.getElementById('btn-cancel-edit').style.display = 'block';
+
+    await loadSchedules();
+    appendLog(`✅ 排程「${data.name || data.schedule_id}」已儲存\n   下次執行: ${data.next_run || '—'}`);
+  } catch (e) {
+    alert('錯誤: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 儲存排程';
+  }
+}
+
+async function deleteSchedule(sid) {
+  if (!confirm('確定要刪除此排程？')) return;
+  await fetch(`/api/schedules/${sid}`, { method: 'DELETE' });
+  if (document.getElementById('editing-schedule-id').value === sid) cancelEdit();
+  await loadSchedules();
+}
+
+async function toggleSchedule(sid, enable) {
+  const action = enable ? 'enable' : 'disable';
+  await fetch(`/api/schedules/${sid}/${action}`, { method: 'POST' });
+  await loadSchedules();
+}
+
+async function runNow() {
+  const groups = getGroupConfigs();
+  const hours = getSelectedHours();
+
+  if (groups.length === 0 || groups.some(g => !g.group_url)) {
+    alert('請填入至少一個社團網址');
+    return;
+  }
+
+  let sid = document.getElementById('editing-schedule-id').value;
+
+  // 先儲存（確保用最新的設定）
+  if (!sid || hours.length === 0) {
+    if (hours.length === 0) {
+      // 沒選時段，還是可以立即執行，但先強制儲存一個時段
+      alert('請至少選擇一個執行時段再儲存，或直接到「一次性爬取」頁面立即執行');
+      return;
+    }
+  }
+
+  await saveSchedule();
+  sid = document.getElementById('editing-schedule-id').value;
+  if (!sid) { alert('請先儲存排程'); return; }
+
+  const btn = document.getElementById('btn-run-now');
+  btn.disabled = true;
+
+  try {
+    const resp = await fetch(`/api/schedules/${sid}/run-now`, { method: 'POST' });
+    if (!resp.ok) {
+      const err = await resp.json();
+      alert(err.detail || '啟動失敗');
+      return;
+    }
+    const data = await resp.json();
+    currentJobId = data.job_id;
+    runningScheduleId = sid;
+
+    const sched = window._schedules?.find(x => x.schedule_id === sid);
+    document.getElementById('log-schedule-name').textContent = sched?.name ? `— ${sched.name}` : '';
+    document.getElementById('log-card').style.display = 'block';
+    document.getElementById('log-box').textContent = '';
+    document.getElementById('report-link-card').style.display = 'none';
+    document.getElementById('log-card').scrollIntoView({ behavior: 'smooth' });
+
+    appendLog(`▶ 立即執行: ${sid}`);
+    setJobUI('running');
+    listenToJob(currentJobId);
+  } catch (e) {
+    alert('錯誤: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── 排程列表渲染 ──────────────────────────────
+
+function renderSchedules(schedules) {
+  window._schedules = schedules;
+  const container = document.getElementById('schedules-list');
+
+  if (!schedules.length) {
+    container.innerHTML = '<div class="empty-state">尚無排程，點「新增排程」開始設定</div>';
+    return;
+  }
+
+  const dayNames = ['一','二','三','四','五','六','日'];
+
+  container.innerHTML = schedules.map(s => {
+    const groupSummary = (s.groups || []).map(g => {
+      const parts = g.group_url.split('/').filter(Boolean);
+      return parts[parts.length - 1] || g.group_url;
+    }).join('、');
+
+    const weekdayStr = s.weekdays?.length
+      ? s.weekdays.map(d => '週' + dayNames[d]).join(' ')
+      : '每天';
+    const hourStr = (s.hours || []).map(h => h + ':00').join('、');
+
+    let lastRunHtml = '<span class="pending">尚未執行</span>';
+    if (s.last_run) {
+      if (s.last_run_ok === true) {
+        lastRunHtml = `<span class="ok">✅ ${s.last_run}</span>`;
+      } else if (s.last_run_ok === false) {
+        lastRunHtml = `<span class="fail">❌ ${s.last_run}</span>`;
+      } else {
+        lastRunHtml = `<span class="pending">${s.last_run}</span>`;
+      }
+    }
+
+    const enabledClass = s.enabled ? 'active' : 'inactive';
+    const toggleLabel = s.enabled ? '停用' : '啟用';
+    const toggleAction = s.enabled ? 'false' : 'true';
+    const name = s.name || `排程 ${s.schedule_id.slice(0, 6)}`;
+
+    return `
+      <div class="schedule-card" id="sc-${s.schedule_id}">
+        <div class="schedule-card-top">
+          <div class="schedule-status-dot ${enabledClass}"></div>
+          <div class="schedule-card-info">
+            <div class="schedule-card-name">${name}</div>
+            <div class="schedule-card-groups">社團: ${groupSummary}</div>
+            <div class="schedule-card-meta">
+              <div class="meta-item">⏰ <strong>${weekdayStr} ${hourStr}</strong></div>
+              <div class="meta-item">下次: <strong>${s.next_run || (s.enabled ? '計算中' : '已停用')}</strong></div>
+              <div class="meta-item">上次: ${lastRunHtml}</div>
+            </div>
+          </div>
+        </div>
+        <div class="schedule-card-actions">
+          <button class="btn-xs primary" onclick="runNowDirect('${s.schedule_id}')">▶ 立即執行</button>
+          <button class="btn-xs" onclick="editSchedule('${s.schedule_id}')">✏️ 編輯</button>
+          <button class="btn-xs" onclick="toggleSchedule('${s.schedule_id}', ${toggleAction})">${toggleLabel}</button>
+          <button class="btn-xs danger" onclick="deleteSchedule('${s.schedule_id}')">🗑 刪除</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function runNowDirect(sid) {
+  const sched = window._schedules?.find(x => x.schedule_id === sid);
+  if (!sched) return;
+
+  try {
+    const resp = await fetch(`/api/schedules/${sid}/run-now`, { method: 'POST' });
+    if (!resp.ok) {
+      const err = await resp.json();
+      alert(err.detail || '啟動失敗');
+      return;
+    }
+    const data = await resp.json();
+    currentJobId = data.job_id;
+
+    document.getElementById('log-schedule-name').textContent = sched.name ? `— ${sched.name}` : '';
+    document.getElementById('log-card').style.display = 'block';
+    document.getElementById('log-box').textContent = '';
+    document.getElementById('report-link-card').style.display = 'none';
+    document.getElementById('log-card').scrollIntoView({ behavior: 'smooth' });
+
+    appendLog(`▶ 立即執行排程「${sched.name || sid}」`);
+    setJobUI('running');
+    listenToJob(currentJobId);
+  } catch (e) {
+    alert('錯誤: ' + e.message);
+  }
+}
+
+async function loadSchedules() {
+  try {
+    const resp = await fetch('/api/schedules');
+    const schedules = await resp.json();
+    renderSchedules(schedules);
+  } catch (e) {}
+}
+
+// ── 任務串流 ──────────────────────────────────
+
+function setJobUI(state) {
+  const dot = document.getElementById('job-status-dot');
+  const text = document.getElementById('job-status-text');
+  dot.className = 'status-dot ' + state;
+  const map = { running: '執行中', completed: '已完成', stopped: '已停止', failed: '失敗', idle: '閒置' };
+  text.textContent = map[state] || '閒置';
+}
+
+function appendLog(msg) {
+  const box = document.getElementById('log-box');
+  box.textContent += msg + '\n';
+  box.scrollTop = box.scrollHeight;
+}
+
+function listenToJob(jobId) {
+  if (evtSource) evtSource.close();
+  evtSource = new EventSource(`/api/scrape/${jobId}/logs`);
+
+  evtSource.onmessage = function(event) {
+    const msg = JSON.parse(event.data);
+    if (msg.type === 'log') {
+      appendLog(msg.message);
+      const roundMatch = msg.message.match(/第 (\d+)\/(\d+) 輪/);
+      if (roundMatch) {
+        document.getElementById('stats-text').textContent = `第 ${roundMatch[1]}/${roundMatch[2]} 輪`;
+      }
+    } else if (msg.type === 'done') {
+      evtSource.close();
+      evtSource = null;
+      setJobUI(msg.status);
+      if (msg.report_url) {
+        document.getElementById('report-link-card').style.display = 'block';
+        document.getElementById('report-link').href = msg.report_url;
+        document.getElementById('report-url-text').textContent = msg.report_url;
+      }
+      loadSchedules();
+    }
+  };
+
+  evtSource.onerror = function() {
+    evtSource.close();
+    evtSource = null;
+    setJobUI('failed');
+    appendLog('\n[連線中斷]');
+  };
+}
+
+// ── 初始化 ────────────────────────────────────
+
+loadSchedules();
+schedulePoll = setInterval(loadSchedules, 30000);
+</script>
+
+</body>
+</html>

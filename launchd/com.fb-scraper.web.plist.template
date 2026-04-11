@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.fb-scraper.web</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__INSTALL_DIR__/.venv/bin/uvicorn</string>
+        <string>app.main:app</string>
+        <string>--port</string>
+        <string>__WEB_PORT__</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__INSTALL_DIR__</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>__INSTALL_DIR__/logs/web.log</string>
+    <key>StandardErrorPath</key>
+    <string>__INSTALL_DIR__/logs/web-error.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>__INSTALL_DIR__/.venv/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>

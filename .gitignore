@@ -1,0 +1,15 @@
+config.json
+schedule_config.json
+.venv/
+__pycache__/
+output_*/
+output/
+test_run/
+logs/
+*.pyc
+*.jpg
+*.png
+.DS_Store
+posts_data.json
+snapshot.txt
+.claude/

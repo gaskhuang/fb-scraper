@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facebook 社團爬蟲</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232730;
+    --border: #2e3340;
+    --text: #e4e6eb;
+    --text2: #8b8fa3;
+    --accent: #4f8cff;
+    --accent2: #3a6fd8;
+    --green: #34c759;
+    --red: #ff453a;
+    --orange: #ff9f0a;
+    --radius: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  .container { max-width: 900px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 32px; }
+  header h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+  header p { color: var(--text2); font-size: 14px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .card-header h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text2);
+    letter-spacing: 0.5px;
+  }
+
+  /* ── 社團列表 ── */
+  #groups-list { display: flex; flex-direction: column; gap: 12px; }
+
+  .group-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    position: relative;
+  }
+
+  .group-item .group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .group-item .group-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  .btn-remove {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text2);
+    font-size: 12px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-remove:hover { border-color: var(--red); color: var(--red); }
+
+  .group-url-row { margin-bottom: 12px; }
+
+  .group-url-row input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .group-url-row input:focus { border-color: var(--accent); }
+
+  .group-filters {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+    gap: 8px;
+  }
+
+  .filter-field label {
+    display: block;
+    font-size: 11px;
+    color: var(--text2);
+    margin-bottom: 4px;
+  }
+
+  .filter-field input,
+  .filter-field select {
+    width: 100%;
+    padding: 7px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+  }
+
+  .filter-field input:focus,
+  .filter-field select:focus { border-color: var(--accent); }
+
+  /* 時間欄位：數字+單位合在一起 */
+  .time-mini {
+    display: flex;
+    gap: 4px;
+  }
+
+  .time-mini input { flex: 1; min-width: 0; }
+  .time-mini select { width: 62px; flex-shrink: 0; }
+
+  /* ── 全域設定 ── */
+  .global-settings {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .form-row { margin-bottom: 0; }
+
+  label {
+    display: block;
+    font-size: 14px;
+    color: var(--text2);
+    margin-bottom: 6px;
+  }
+
+  input[type="number"] {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input[type="number"]:focus { border-color: var(--accent); }
+
+  .hint { font-size: 12px; color: var(--text2); margin-top: 4px; }
+
+  /* ── 按鈕 ── */
+  .btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-add {
+    background: var(--surface2);
+    border: 1px dashed var(--border);
+    color: var(--text2);
+    width: 100%;
+    margin-top: 4px;
+    padding: 10px;
+    font-size: 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-add:hover { border-color: var(--accent); color: var(--accent); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+    width: 100%;
+  }
+
+  .btn-primary:hover { background: var(--accent2); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-danger {
+    background: var(--red);
+    color: white;
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  .btn-danger:hover { opacity: 0.85; }
+
+  /* ── 日誌 ── */
+  #log-box {
+    background: #0a0c10;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    height: 400px;
+    overflow-y: auto;
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #c0c4d0;
+  }
+
+  #log-box:empty::before {
+    content: '等待開始爬取...';
+    color: var(--text2);
+  }
+
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border-radius: 8px;
+    margin-top: 12px;
+    font-size: 14px;
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 8px;
+  }
+
+  .status-dot.idle { background: var(--text2); }
+  .status-dot.running { background: var(--orange); animation: pulse 1.5s infinite; }
+  .status-dot.completed { background: var(--green); }
+  .status-dot.stopped { background: var(--orange); }
+  .status-dot.failed { background: var(--red); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ── 結果表格 ── */
+  #results-section { display: none; margin-top: 12px; }
+
+  #results-section h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text2);
+    margin-bottom: 10px;
+  }
+
+  .result-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .result-table th {
+    text-align: left;
+    padding: 8px 12px;
+    background: var(--surface2);
+    color: var(--text2);
+    font-weight: 500;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .result-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    word-break: break-all;
+  }
+
+  .result-table tr:last-child td { border-bottom: none; }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .badge-green { background: rgba(52,199,89,0.15); color: var(--green); }
+  .badge-red   { background: rgba(255,69,58,0.15); color: var(--red); }
+
+  /* ── 開關 ── */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .toggle-row label { margin-bottom: 0; font-size: 14px; }
+  .toggle {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .toggle input { display: none; }
+  .toggle .slider {
+    position: absolute;
+    inset: 0;
+    background: var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle .slider::before {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 20px; height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.2s;
+  }
+  .toggle input:checked + .slider { background: var(--accent); }
+  .toggle input:checked + .slider::before { transform: translateX(20px); }
+
+  /* ── 報告連結 ── */
+  .report-link-card {
+    display: none;
+    margin-top: 12px;
+    padding: 16px;
+    background: rgba(79,140,255,0.1);
+    border: 1px solid rgba(79,140,255,0.3);
+    border-radius: 8px;
+    text-align: center;
+  }
+  .report-link-card a {
+    color: var(--accent);
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .report-link-card a:hover { text-decoration: underline; }
+  .btn-publish {
+    background: var(--surface2);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    width: 100%;
+    margin-top: 8px;
+    font-size: 14px;
+    padding: 10px;
+  }
+  .btn-publish:hover { background: rgba(79,140,255,0.1); }
+  .btn-publish:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Facebook 社團爬蟲</h1>
+    <p>cdp-cli 驅動 · 模擬真人瀏覽行為 · 支援多社團批次爬取</p>
+    <div style="display:flex;justify-content:center;gap:8px;margin-top:16px">
+      <a href="/" style="padding:8px 20px;background:var(--accent);color:#fff;border-radius:8px;text-decoration:none;font-size:14px;font-weight:600">一次性爬取</a>
+      <a href="/scheduler" style="padding:8px 20px;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:8px;text-decoration:none;font-size:14px;font-weight:600">排程爬取</a>
+      <a href="/settings" style="padding:8px 20px;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:8px;text-decoration:none;font-size:14px;font-weight:600">設定</a>
+    </div>
+  </header>
+
+  <!-- 社團列表 -->
+  <div class="card">
+    <div class="card-header">
+      <h2>社團列表</h2>
+      <span id="group-count-label" style="font-size:13px;color:var(--text2)">共 1 個社團</span>
+    </div>
+
+    <div id="groups-list"></div>
+
+    <button class="btn-add" onclick="addGroup()">＋ 新增社團</button>
+  </div>
+
+  <!-- 全域設定 -->
+  <div class="card">
+    <div class="card-header">
+      <h2>全域設定</h2>
+    </div>
+    <div class="global-settings">
+      <div class="form-row">
+        <label for="max-rounds">最大滾動輪數</label>
+        <input type="number" id="max-rounds" value="20" min="1">
+        <div class="hint">每輪隨機滾動 3–6 次，搭配隨機延遲模擬真人操作</div>
+      </div>
+      <div class="form-row">
+        <label>爬完自動發布</label>
+        <div class="toggle-row">
+          <label class="toggle">
+            <input type="checkbox" id="auto-publish" checked>
+            <span class="slider"></span>
+          </label>
+          <span style="font-size:13px;color:var(--text2)">推送到 GitHub Pages，取得遠端瀏覽連結</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 按鈕 -->
+  <button class="btn btn-primary" id="btn-start" onclick="startScrape()">開始爬取全部</button>
+  <button class="btn btn-danger" id="btn-stop" style="display:none" onclick="stopScrape()">停止</button>
+
+  <!-- 日誌 -->
+  <div class="card" style="margin-top:20px">
+    <h2 style="font-size:16px;font-weight:600;color:var(--text2);margin-bottom:16px">執行紀錄</h2>
+    <pre id="log-box"></pre>
+    <div class="status-bar">
+      <span>
+        <span class="status-dot idle" id="status-dot"></span>
+        <span id="status-text">閒置</span>
+      </span>
+      <span id="stats-text"></span>
+    </div>
+
+    <div class="report-link-card" id="report-link-card">
+      <div>📊 <a id="report-link" href="#" target="_blank">開啟線上報告</a></div>
+      <div style="font-size:12px;color:var(--text2);margin-top:6px" id="report-url-text"></div>
+    </div>
+
+    <button class="btn btn-publish" id="btn-publish" style="display:none" onclick="manualPublish()">
+      📤 推送到 GitHub Pages
+    </button>
+
+    <div id="results-section">
+      <h3 style="margin-top:16px">爬取結果摘要</h3>
+      <table class="result-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>社團</th>
+            <th>篇數</th>
+            <th>狀態</th>
+            <th>輸出目錄</th>
+          </tr>
+        </thead>
+        <tbody id="results-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+let groupCounter = 0;
+let currentJobId = null;
+let evtSource = null;
+
+// ── 社團管理 ──────────────────────────────────
+
+function addGroup(data) {
+  groupCounter++;
+  const id = `g${groupCounter}`;
+  const d = data || {};
+
+  const item = document.createElement('div');
+  item.className = 'group-item';
+  item.id = id;
+  item.innerHTML = `
+    <div class="group-header">
+      <span class="group-label">社團 #${groupCounter}</span>
+      <button class="btn-remove" onclick="removeGroup('${id}')">移除</button>
+    </div>
+    <div class="group-url-row">
+      <input type="text" class="g-url" placeholder="https://www.facebook.com/groups/..." value="${d.url || ''}">
+    </div>
+    <div class="group-filters">
+      <div class="filter-field">
+        <label>時間範圍</label>
+        <div class="time-mini">
+          <input type="number" class="g-time-val" placeholder="24" value="${d.timeVal || ''}">
+          <select class="g-time-unit">
+            <option value="h" ${(d.timeUnit||'h')==='h'?'selected':''}>小時</option>
+            <option value="d" ${(d.timeUnit||'')==='d'?'selected':''}>天</option>
+            <option value="w" ${(d.timeUnit||'')==='w'?'selected':''}>週</option>
+          </select>
+        </div>
+      </div>
+      <div class="filter-field">
+        <label>最多篇數</label>
+        <input type="number" class="g-top-n" value="${d.topN ?? 0}" min="0">
+      </div>
+      <div class="filter-field">
+        <label>最低讚數</label>
+        <input type="number" class="g-likes" value="${d.minLikes ?? 0}" min="0">
+      </div>
+      <div class="filter-field">
+        <label>最低留言</label>
+        <input type="number" class="g-comments" value="${d.minComments ?? 0}" min="0">
+      </div>
+      <div class="filter-field">
+        <label>最低分享</label>
+        <input type="number" class="g-shares" value="${d.minShares ?? 0}" min="0">
+      </div>
+    </div>
+  `;
+
+  document.getElementById('groups-list').appendChild(item);
+  updateGroupCountLabel();
+}
+
+function removeGroup(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+  updateGroupCountLabel();
+}
+
+function updateGroupCountLabel() {
+  const count = document.querySelectorAll('.group-item').length;
+  document.getElementById('group-count-label').textContent = `共 ${count} 個社團`;
+}
+
+function getGroupConfigs() {
+  const items = document.querySelectorAll('.group-item');
+  return Array.from(items).map(item => {
+    const url = item.querySelector('.g-url').value.trim();
+    const timeVal = item.querySelector('.g-time-val').value.trim();
+    const timeUnit = item.querySelector('.g-time-unit').value;
+    const within = timeVal ? `${timeVal}${timeUnit}` : '';
+    return {
+      group_url: url,
+      top_n: parseInt(item.querySelector('.g-top-n').value) || 0,
+      min_likes: parseInt(item.querySelector('.g-likes').value) || 0,
+      min_comments: parseInt(item.querySelector('.g-comments').value) || 0,
+      min_shares: parseInt(item.querySelector('.g-shares').value) || 0,
+      within,
+    };
+  });
+}
+
+// ── UI 狀態 ──────────────────────────────────
+
+function setUI(state) {
+  const btnStart = document.getElementById('btn-start');
+  const btnStop = document.getElementById('btn-stop');
+  const dot = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+
+  dot.className = 'status-dot ' + state;
+
+  if (state === 'running') {
+    btnStart.disabled = true;
+    btnStart.textContent = '爬取中...';
+    btnStop.style.display = 'block';
+    text.textContent = '執行中';
+  } else if (state === 'completed') {
+    btnStart.disabled = false;
+    btnStart.textContent = '開始爬取全部';
+    btnStop.style.display = 'none';
+    text.textContent = '已完成';
+  } else if (state === 'stopped') {
+    btnStart.disabled = false;
+    btnStart.textContent = '開始爬取全部';
+    btnStop.style.display = 'none';
+    text.textContent = '已停止';
+  } else if (state === 'failed') {
+    btnStart.disabled = false;
+    btnStart.textContent = '開始爬取全部';
+    btnStop.style.display = 'none';
+    text.textContent = '失敗';
+  } else {
+    btnStart.disabled = false;
+    btnStart.textContent = '開始爬取全部';
+    btnStop.style.display = 'none';
+    text.textContent = '閒置';
+  }
+}
+
+function appendLog(msg) {
+  const box = document.getElementById('log-box');
+  box.textContent += msg + '\n';
+  box.scrollTop = box.scrollHeight;
+}
+
+// ── 爬取 ──────────────────────────────────────
+
+async function startScrape() {
+  const groups = getGroupConfigs();
+  const invalidGroups = groups.filter(g => !g.group_url);
+  if (groups.length === 0) {
+    alert('請至少新增一個社團');
+    return;
+  }
+  if (invalidGroups.length > 0) {
+    alert('有社團尚未填入網址，請補齊後再試');
+    return;
+  }
+
+  document.getElementById('log-box').textContent = '';
+  document.getElementById('results-section').style.display = 'none';
+  document.getElementById('results-body').innerHTML = '';
+  document.getElementById('stats-text').textContent = '';
+  document.getElementById('report-link-card').style.display = 'none';
+  document.getElementById('btn-publish').style.display = 'none';
+  setUI('running');
+
+  const payload = {
+    groups,
+    max_rounds: parseInt(document.getElementById('max-rounds').value) || 200,
+    auto_publish: document.getElementById('auto-publish').checked,
+  };
+
+  try {
+    const resp = await fetch('/api/scrape', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      appendLog('錯誤: ' + (err.detail || JSON.stringify(err)));
+      setUI('failed');
+      return;
+    }
+
+    const data = await resp.json();
+    currentJobId = data.job_id;
+    appendLog(`任務已啟動: ${currentJobId}`);
+    appendLog(`共 ${groups.length} 個社團，輸出根目錄: ${data.output_dir}\n`);
+
+    if (evtSource) evtSource.close();
+    evtSource = new EventSource(`/api/scrape/${currentJobId}/logs`);
+
+    evtSource.onmessage = function(event) {
+      const msg = JSON.parse(event.data);
+
+      if (msg.type === 'log') {
+        appendLog(msg.message);
+
+        // 進度解析
+        const groupMatch = msg.message.match(/\[(\d+)\/(\d+)\]/);
+        if (groupMatch) {
+          document.getElementById('stats-text').textContent =
+            `社團 ${groupMatch[1]} / ${groupMatch[2]}`;
+        }
+        const roundMatch = msg.message.match(/第 (\d+)\/(\d+) 輪/);
+        if (roundMatch) {
+          const cur = document.getElementById('stats-text').textContent.split('|')[0].trim();
+          document.getElementById('stats-text').textContent =
+            `${cur} | 第 ${roundMatch[1]}/${roundMatch[2]} 輪`;
+        }
+        const totalMatch = msg.message.match(/累計 (\d+)/);
+        if (totalMatch) {
+          const cur = document.getElementById('stats-text').textContent.split('篇')[0];
+          document.getElementById('stats-text').textContent =
+            cur.trim() + ` | 已收集 ${totalMatch[1]} 篇`;
+        }
+
+      } else if (msg.type === 'done') {
+        evtSource.close();
+        evtSource = null;
+        setUI(msg.status);
+
+        // 顯示報告連結
+        if (msg.report_url) {
+          document.getElementById('report-link-card').style.display = 'block';
+          document.getElementById('report-link').href = msg.report_url;
+          document.getElementById('report-url-text').textContent = msg.report_url;
+        } else {
+          // 沒有自動 publish，顯示手動 publish 按鈕
+          document.getElementById('btn-publish').style.display = 'block';
+        }
+
+        // 顯示結果表格
+        if (msg.results && msg.results.length > 0) {
+          document.getElementById('results-section').style.display = 'block';
+          const tbody = document.getElementById('results-body');
+          msg.results.forEach((r, i) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td>${i + 1}</td>
+              <td>${r.url}</td>
+              <td>${r.post_count} 篇</td>
+              <td><span class="badge ${r.status === 'completed' ? 'badge-green' : 'badge-red'}">${r.status === 'completed' ? '完成' : '失敗'}</span></td>
+              <td style="font-size:11px;color:var(--text2)">${r.output_dir}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+          document.getElementById('stats-text').textContent =
+            `共完成 ${msg.results.filter(r=>r.status==='completed').length}/${msg.results.length} 個社團，合計 ${msg.post_count} 篇`;
+        }
+      }
+    };
+
+    evtSource.onerror = function() {
+      evtSource.close();
+      evtSource = null;
+      setUI('failed');
+      appendLog('\n[連線中斷]');
+    };
+
+  } catch (e) {
+    appendLog('錯誤: ' + e.message);
+    setUI('failed');
+  }
+}
+
+async function stopScrape() {
+  if (!currentJobId) return;
+  try {
+    await fetch(`/api/scrape/${currentJobId}/stop`, { method: 'POST' });
+    appendLog('\n正在停止，等待目前社團完成...');
+  } catch (e) {
+    appendLog('停止錯誤: ' + e.message);
+  }
+}
+
+// ── 手動推送 ──────────────────────────────────
+
+async function manualPublish() {
+  if (!currentJobId) return;
+  const btn = document.getElementById('btn-publish');
+  btn.disabled = true;
+  btn.textContent = '推送中...';
+  appendLog('\n📤 正在推送到 GitHub Pages...');
+
+  try {
+    const resp = await fetch(`/api/scrape/${currentJobId}/publish`, { method: 'POST' });
+    if (!resp.ok) {
+      const err = await resp.json();
+      appendLog('推送失敗: ' + (err.detail || JSON.stringify(err)));
+      btn.disabled = false;
+      btn.textContent = '📤 推送到 GitHub Pages';
+      return;
+    }
+    const data = await resp.json();
+    appendLog('✅ 推送成功: ' + data.report_url);
+    btn.style.display = 'none';
+    document.getElementById('report-link-card').style.display = 'block';
+    document.getElementById('report-link').href = data.report_url;
+    document.getElementById('report-url-text').textContent = data.report_url;
+  } catch (e) {
+    appendLog('推送錯誤: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = '📤 推送到 GitHub Pages';
+  }
+}
+
+// ── 初始化：預設新增一個社團欄位 ──────────────
+addGroup({ url: 'https://www.facebook.com/groups/gaitech' });
+</script>
+
+</body>
+</html>
