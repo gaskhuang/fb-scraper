@@ -19,6 +19,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 
 # 讓 scripts/ 可以被 import
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -30,6 +33,20 @@ from scripts.config_loader import load_config, save_config
 from scripts.notify import notify_scrape_done, detect_chat_id
 
 app = FastAPI(title="FB Group Scraper")
+
+
+# 禁止瀏覽器快取靜態 HTML，確保每次拿到最新版
+class NoCacheMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        if request.url.path in ("/", "/scheduler", "/settings") or request.url.path.endswith(".html"):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
+
+
+app.add_middleware(NoCacheMiddleware)
 
 # 靜態檔案
 STATIC_DIR = Path(__file__).parent / "static"
