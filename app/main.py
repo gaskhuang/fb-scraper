@@ -59,6 +59,9 @@ class BatchScrapeParams(BaseModel):
 # Job 管理
 # ──────────────────────────────────────────────
 
+MAX_JOB_HOURS = 4  # 超過此時間視為卡住，強制標記失敗
+
+
 class ScrapeJob:
     def __init__(self, job_id: str, params: BatchScrapeParams):
         self.job_id = job_id
@@ -67,6 +70,7 @@ class ScrapeJob:
         self.log_queue: queue.Queue = queue.Queue()
         self.thread: threading.Thread | None = None
         self.stop_flag = threading.Event()
+        self.started_at = datetime.now()
         self.base_output_dir = ""
         self.unified_html_path = ""
         self.report_url = ""
@@ -157,6 +161,27 @@ _jobs: dict[str, ScrapeJob] = {}
 _active_job_id: str | None = None
 
 
+def _get_active_job() -> Optional[ScrapeJob]:
+    """回傳真正還在執行中的 job；若 thread 已死或超時則自動標記失敗。"""
+    global _active_job_id
+    if not _active_job_id:
+        return None
+    job = _jobs.get(_active_job_id)
+    if not job or job.status != "running":
+        return None
+    # thread 已結束但沒更新 status → 標記失敗
+    if job.thread and not job.thread.is_alive():
+        job.status = "failed"
+        return None
+    # 超過最大時限 → 視為卡住，強制標記失敗並設 stop_flag
+    elapsed_hours = (datetime.now() - job.started_at).total_seconds() / 3600
+    if elapsed_hours > MAX_JOB_HOURS:
+        job.status = "failed"
+        job.stop_flag.set()
+        return None
+    return job
+
+
 # ──────────────────────────────────────────────
 # API 路由
 # ──────────────────────────────────────────────
@@ -170,10 +195,8 @@ async def index():
 async def start_scrape(params: BatchScrapeParams):
     global _active_job_id
 
-    if _active_job_id and _active_job_id in _jobs:
-        active = _jobs[_active_job_id]
-        if active.status == "running":
-            raise HTTPException(409, "已有正在執行的爬蟲任務，請等待完成或停止後再試。")
+    if _get_active_job():
+        raise HTTPException(409, "已有正在執行的爬蟲任務，請等待完成或停止後再試。")
 
     if not params.groups:
         raise HTTPException(400, "請至少新增一個社團。")
@@ -205,37 +228,42 @@ async def stream_logs(job_id: str):
         raise HTTPException(404, "Job not found")
 
     async def event_generator():
-        while True:
-            try:
-                msg = job.log_queue.get_nowait()
-                if msg is None:
-                    total_posts = sum(r["post_count"] for r in job.results)
-                    data = json.dumps({
-                        "type": "done",
-                        "status": job.status,
-                        "post_count": total_posts,
-                        "output_dir": job.base_output_dir,
-                        "report_url": job.report_url,
-                        "results": job.results,
-                    })
+        try:
+            while True:
+                try:
+                    msg = job.log_queue.get_nowait()
+                    if msg is None:
+                        total_posts = sum(r["post_count"] for r in job.results)
+                        data = json.dumps({
+                            "type": "done",
+                            "status": job.status,
+                            "post_count": total_posts,
+                            "output_dir": job.base_output_dir,
+                            "report_url": job.report_url,
+                            "results": job.results,
+                        })
+                        yield f"data: {data}\n\n"
+                        break
+                    data = json.dumps({"type": "log", "message": msg})
                     yield f"data: {data}\n\n"
-                    break
-                data = json.dumps({"type": "log", "message": msg})
-                yield f"data: {data}\n\n"
-            except queue.Empty:
-                await asyncio.sleep(0.3)
-                if job.status in ("completed", "stopped", "failed") and job.log_queue.empty():
-                    total_posts = sum(r["post_count"] for r in job.results)
-                    data = json.dumps({
-                        "type": "done",
-                        "status": job.status,
-                        "post_count": total_posts,
-                        "output_dir": job.base_output_dir,
-                        "report_url": job.report_url,
-                        "results": job.results,
-                    })
-                    yield f"data: {data}\n\n"
-                    break
+                except queue.Empty:
+                    await asyncio.sleep(0.3)
+                    if job.status in ("completed", "stopped", "failed") and job.log_queue.empty():
+                        total_posts = sum(r["post_count"] for r in job.results)
+                        data = json.dumps({
+                            "type": "done",
+                            "status": job.status,
+                            "post_count": total_posts,
+                            "output_dir": job.base_output_dir,
+                            "report_url": job.report_url,
+                            "results": job.results,
+                        })
+                        yield f"data: {data}\n\n"
+                        break
+        except GeneratorExit:
+            # 瀏覽器關閉 / 頁面離開 → 通知爬蟲停止
+            if job.status == "running":
+                job.stop_flag.set()
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
@@ -367,10 +395,13 @@ class _SchedulerManager:
         self._ensure_loop()
         return entry
 
-    def delete(self, schedule_id: str):
+    def delete(self, schedule_id: str) -> bool:
         with self._lock:
-            self._schedules.pop(schedule_id, None)
+            if schedule_id not in self._schedules:
+                return False
+            self._schedules.pop(schedule_id)
             self._save_to_disk()
+            return True
 
     def disable(self, schedule_id: str):
         with self._lock:
@@ -458,10 +489,8 @@ class _SchedulerManager:
                 threading.Thread(target=self._run_job, args=(entry,), daemon=True).start()
 
     def _run_job(self, entry: _ScheduleEntry):
-        global _active_job_id
-        if _active_job_id and _active_job_id in _jobs:
-            if _jobs[_active_job_id].status == "running":
-                return
+        if _get_active_job():
+            return
         params = BatchScrapeParams(
             groups=entry.config.groups,
             max_rounds=entry.config.max_rounds,
@@ -505,8 +534,10 @@ async def save_schedule(config: ScheduleConfig):
 
 @app.delete("/api/schedules/{schedule_id}")
 async def delete_schedule(schedule_id: str):
-    _scheduler_mgr.delete(schedule_id)
-    return {"deleted": schedule_id}
+    ok = _scheduler_mgr.delete(schedule_id)
+    if not ok:
+        raise HTTPException(404, detail=f"排程 {schedule_id} 不存在")
+    return {"deleted": schedule_id, "ok": True}
 
 
 @app.post("/api/schedules/{schedule_id}/disable")
@@ -530,9 +561,8 @@ async def run_schedule_now(schedule_id: str):
     if not entry:
         raise HTTPException(404, "排程不存在")
     global _active_job_id
-    if _active_job_id and _active_job_id in _jobs:
-        if _jobs[_active_job_id].status == "running":
-            raise HTTPException(409, "已有正在執行的爬蟲任務")
+    if _get_active_job():
+        raise HTTPException(409, "已有正在執行的爬蟲任務")
     params = BatchScrapeParams(
         groups=entry.config.groups,
         max_rounds=entry.config.max_rounds,

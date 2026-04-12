@@ -836,9 +836,18 @@ async function saveSchedule() {
 
 async function deleteSchedule(sid) {
   if (!confirm('確定要刪除此排程？')) return;
-  await fetch(`/api/schedules/${sid}`, { method: 'DELETE' });
-  if (document.getElementById('editing-schedule-id').value === sid) cancelEdit();
-  await loadSchedules();
+  try {
+    const resp = await fetch(`/api/schedules/${sid}`, { method: 'DELETE' });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      alert('刪除失敗：' + (err.detail || resp.statusText));
+      return;
+    }
+    if (document.getElementById('editing-schedule-id').value === sid) cancelEdit();
+    await loadSchedules();
+  } catch (e) {
+    alert('刪除失敗：' + e.message);
+  }
 }
 
 async function toggleSchedule(sid, enable) {
