@@ -259,78 +259,46 @@ def extract_posts(page_match):
 
         function extractMetrics(postEl, reactionBar) {
             var likes = 0, comments = 0, shares = 0;
-            var fullText = postEl.innerText;
-            var commentDebug = '', sharesDebug = '';
+            var metricsDebug = '';
 
-            // ── 留言數：用 indexOf 定位「則留言」，向前找最近的數字 ──
-            var ciIdx = fullText.indexOf('則留言');
-            if (ciIdx >= 0) {
-                var cBefore = fullText.substring(Math.max(0, ciIdx - 30), ciIdx);
-                var cNum = cBefore.match(/([\d,]+)\s*$/);
-                if (cNum) {
-                    comments = parseInt(cNum[1].replace(/,/g, ''), 10);
-                    commentDebug = 'zh:' + cNum[1];
-                } else {
-                    commentDebug = 'zh_no_num|' + JSON.stringify(cBefore.trim().slice(-10));
-                }
-            } else {
-                // 英文介面：「N comments」
-                var enIdx = fullText.toLowerCase().indexOf('comment');
-                if (enIdx >= 0) {
-                    var enBefore = fullText.substring(Math.max(0, enIdx - 20), enIdx);
-                    var enNum = enBefore.match(/([\d,]+)\s*$/);
-                    if (enNum) {
-                        comments = parseInt(enNum[1].replace(/,/g, ''), 10);
-                        commentDebug = 'en:' + enNum[1];
-                    } else {
-                        commentDebug = 'en_no_num|' + JSON.stringify(enBefore.trim().slice(-10));
-                    }
-                } else {
-                    commentDebug = 'not_found';
-                }
-            }
-
-            // ── 分享數：「N 次分享」 ──
-            var siIdx = fullText.indexOf('次分享');
-            if (siIdx >= 0) {
-                var sBefore = fullText.substring(Math.max(0, siIdx - 30), siIdx);
-                var sNum = sBefore.match(/([\d,]+)\s*$/);
-                if (sNum) {
-                    shares = parseInt(sNum[1].replace(/,/g, ''), 10);
-                    sharesDebug = 'zh:' + sNum[1];
-                } else {
-                    sharesDebug = 'zh_no_num|' + JSON.stringify(sBefore.trim().slice(-10));
-                }
-            } else {
-                var enSIdx = fullText.toLowerCase().indexOf('share');
-                if (enSIdx >= 0) {
-                    var enSBefore = fullText.substring(Math.max(0, enSIdx - 20), enSIdx);
-                    var enSNum = enSBefore.match(/([\d,]+)\s*$/);
-                    if (enSNum) {
-                        shares = parseInt(enSNum[1].replace(/,/g, ''), 10);
-                        sharesDebug = 'en:' + enSNum[1];
-                    } else {
-                        sharesDebug = 'en_no_num';
-                    }
-                } else {
-                    sharesDebug = 'not_found';
-                }
-            }
-
-            // ── 讚數：從 reaction bar 附近取 ──
+            // ── 方法一：從 reaction bar 附近取純數字（新版 Facebook 格式） ──
             if (reactionBar) {
                 var area = reactionBar;
-                for (var j = 0; j < 3; j++) {
+                for (var j = 0; j < 5; j++) {
                     if (area.parentElement) area = area.parentElement;
                 }
-                var barText = area.innerText.trim();
-                barText = barText.replace(/[\d,]+\s*(則留言|次分享|[Cc]omments?|[Ss]hares?)/g, '');
-                var lm = barText.match(/[\d,]+/);
-                if (lm) likes = parseInt(lm[0].replace(/,/g, ''), 10);
+                var areaText = area.innerText.trim();
+                var nums = areaText.split('\\n').map(function(s){ return s.trim(); })
+                    .filter(function(s){ return /^[\\d,]+$/.test(s); });
+                if (nums.length >= 1) likes = parseInt(nums[0].replace(/,/g, ''), 10);
+                if (nums.length >= 2) comments = parseInt(nums[1].replace(/,/g, ''), 10);
+                if (nums.length >= 3) shares = parseInt(nums[2].replace(/,/g, ''), 10);
+                metricsDebug = 'nums:' + nums.join('/');
+            }
+
+            // ── 方法二：fallback 舊版格式「N 則留言」「N 次分享」 ──
+            if (comments === 0 || shares === 0) {
+                var fullText = postEl.innerText;
+                if (comments === 0) {
+                    var ciIdx = fullText.indexOf('則留言');
+                    if (ciIdx >= 0) {
+                        var cBefore = fullText.substring(Math.max(0, ciIdx - 30), ciIdx);
+                        var cNum = cBefore.match(/([\\d,]+)\\s*$/);
+                        if (cNum) { comments = parseInt(cNum[1].replace(/,/g, ''), 10); metricsDebug += '|c_old:' + cNum[1]; }
+                    }
+                }
+                if (shares === 0) {
+                    var siIdx = fullText.indexOf('次分享');
+                    if (siIdx >= 0) {
+                        var sBefore = fullText.substring(Math.max(0, siIdx - 30), siIdx);
+                        var sNum = sBefore.match(/([\\d,]+)\\s*$/);
+                        if (sNum) { shares = parseInt(sNum[1].replace(/,/g, ''), 10); metricsDebug += '|s_old:' + sNum[1]; }
+                    }
+                }
             }
 
             return { likes: likes, comments: comments, shares: shares,
-                     commentDebug: commentDebug, sharesDebug: sharesDebug };
+                     metricsDebug: metricsDebug };
         }
 
         // 判斷 child 是否為貼文容器的備用方法：找 timestamp 連結
@@ -433,7 +401,7 @@ def extract_posts(page_match):
                 author: author, timestamp: timestamp,
                 likes: likes, comments: comments, shares: shares,
                 text: msgText, images: imgUrls, post_url: postUrl,
-                commentDebug: metrics.commentDebug, sharesDebug: metrics.sharesDebug
+                metricsDebug: metrics.metricsDebug
             });
         });
 
@@ -624,10 +592,10 @@ def scrape_group(
 
         log(f"   📝 發現 {len(posts)} 篇 (新增 {new_count}，累計 {len(all_posts)})")
 
-        # 篩選（debug: 顯示前幾篇的提取值）
-        if has_filter and new_count > 0:
-            for dp in all_posts[-new_count:][:3]:
-                log(f"   📊 L={dp.get('likes',0)} C={dp.get('comments',0)} S={dp.get('shares',0)} | c={dp.get('commentDebug','')} s={dp.get('sharesDebug','')} | {(dp.get('text','') or '')[:25]}")
+        # 顯示每篇新文章的讚/留言/轉發數
+        if new_count > 0:
+            for dp in all_posts[-new_count:]:
+                log(f"   📊 👍{dp.get('likes',0)} 💬{dp.get('comments',0)} 🔄{dp.get('shares',0)} | {(dp.get('author','') or '')[:15]} | {(dp.get('text','') or '')[:30]}")
         qualified = _filter_posts(all_posts, min_likes, min_comments, min_shares, within_hours)
 
         if has_filter:
