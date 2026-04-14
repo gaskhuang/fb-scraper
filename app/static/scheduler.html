@@ -501,6 +501,17 @@
       <span style="font-size:14px;color:var(--text2);font-weight:600">社團列表</span>
       <span id="group-count-label" style="font-size:13px;color:var(--text2)">共 0 個社團</span>
     </div>
+    <!-- 批量貼上 -->
+    <div id="bulk-paste-area" style="margin-bottom:12px">
+      <details>
+        <summary style="cursor:pointer;font-size:13px;color:var(--text2);padding:8px 0;user-select:none">📋 批量貼上社團網址（一行一個）</summary>
+        <div style="margin-top:10px">
+          <textarea id="bulk-urls" rows="6" placeholder="https://www.facebook.com/groups/group1/&#10;https://www.facebook.com/groups/group2/&#10;..." style="width:100%;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;font-family:monospace;resize:vertical;box-sizing:border-box"></textarea>
+          <button class="btn btn-secondary" style="margin-top:8px;font-size:13px;padding:8px 16px" onclick="bulkAddGroups()">✅ 批量加入</button>
+        </div>
+      </details>
+    </div>
+
     <div id="groups-list"></div>
     <button class="btn-add" onclick="addGroup()">＋ 新增社團</button>
 
@@ -577,6 +588,11 @@
       <button class="btn btn-primary" id="btn-save" onclick="saveSchedule()">💾 儲存排程</button>
       <div class="action-row">
         <button class="btn btn-secondary" id="btn-run-now" onclick="runNow()">▶ 立即執行</button>
+        <button class="btn btn-secondary" onclick="exportSchedule()" title="匯出此排程設定為 JSON 檔">📤 匯出</button>
+        <label class="btn btn-secondary" style="cursor:pointer" title="從 JSON 檔匯入排程設定">
+          📥 匯入
+          <input type="file" id="import-file" accept=".json" style="display:none" onchange="importSchedule(this)">
+        </label>
         <button class="btn btn-secondary" id="btn-cancel-edit" onclick="cancelEdit()" style="display:none">取消編輯</button>
       </div>
     </div>
@@ -675,18 +691,96 @@ function updateGroupCountLabel() {
 }
 
 function getGroupConfigs() {
-  return Array.from(document.querySelectorAll('.group-item')).map(item => {
-    const timeVal = item.querySelector('.g-time-val').value.trim();
-    const timeUnit = item.querySelector('.g-time-unit').value;
-    return {
-      group_url: item.querySelector('.g-url').value.trim(),
-      top_n: parseInt(item.querySelector('.g-top-n').value) || 0,
-      min_likes: parseInt(item.querySelector('.g-likes').value) || 0,
-      min_comments: parseInt(item.querySelector('.g-comments').value) || 0,
-      min_shares: parseInt(item.querySelector('.g-shares').value) || 0,
-      within: timeVal ? `${timeVal}${timeUnit}` : '',
-    };
-  });
+  const list = document.getElementById('groups-list');
+  return Array.from(list.querySelectorAll('.group-item'))
+    .map(item => {
+      const timeVal = item.querySelector('.g-time-val').value.trim();
+      const timeUnit = item.querySelector('.g-time-unit').value;
+      return {
+        group_url: item.querySelector('.g-url').value.trim(),
+        top_n: parseInt(item.querySelector('.g-top-n').value) || 0,
+        min_likes: parseInt(item.querySelector('.g-likes').value) || 0,
+        min_comments: parseInt(item.querySelector('.g-comments').value) || 0,
+        min_shares: parseInt(item.querySelector('.g-shares').value) || 0,
+        within: timeVal ? `${timeVal}${timeUnit}` : '',
+      };
+    })
+    .filter(g => g.group_url); // 自動過濾空白行
+}
+
+function bulkAddGroups() {
+  const ta = document.getElementById('bulk-urls');
+  const urls = ta.value.split('\n')
+    .map(u => u.trim())
+    .filter(u => u.length > 0 && u.includes('facebook.com'));
+  if (urls.length === 0) { alert('未偵測到有效的 Facebook 社團網址'); return; }
+  urls.forEach(url => addGroup({ url }));
+  ta.value = '';
+  updateGroupCountLabel();
+  // 收起 details
+  const details = document.getElementById('bulk-paste-area').querySelector('details');
+  if (details) details.open = false;
+}
+
+function exportSchedule() {
+  const groups = getGroupConfigs();
+  const hours = getSelectedHours();
+  const weekdays = getSelectedWeekdays();
+  const payload = {
+    schedule_id: document.getElementById('editing-schedule-id').value || '',
+    name: document.getElementById('schedule-name').value.trim(),
+    groups,
+    hours,
+    weekdays,
+    max_rounds: parseInt(document.getElementById('max-rounds').value) || 20,
+    auto_publish: document.getElementById('auto-publish').checked,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const safeName = (payload.name || payload.schedule_id || 'schedule').replace(/[^a-zA-Z0-9\u4e00-\u9fff_-]/g, '_');
+  a.download = `schedule_${safeName}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function importSchedule(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      // 填入表單
+      document.getElementById('editing-schedule-id').value = data.schedule_id || '';
+      document.getElementById('schedule-name').value = data.name || '';
+      document.getElementById('groups-list').innerHTML = '';
+      groupCounter = 0;
+      (data.groups || []).forEach(g => {
+        const within = g.within || '';
+        const m = within.match(/^(\d+)([hdw])$/);
+        addGroup({ url: g.group_url, timeVal: m?.[1]||'', timeUnit: m?.[2]||'h',
+                   topN: g.top_n, minLikes: g.min_likes, minComments: g.min_comments, minShares: g.min_shares });
+      });
+      updateGroupCountLabel();
+      for (let i = 0; i < 24; i++) document.getElementById(`h${i}`).checked = (data.hours||[]).includes(i);
+      for (let i = 0; i < 7; i++) document.getElementById(`wd${i}`).checked = (data.weekdays||[]).includes(i);
+      document.getElementById('max-rounds').value = data.max_rounds ?? 20;
+      document.getElementById('auto-publish').checked = data.auto_publish !== false;
+      if (data.schedule_id) {
+        document.getElementById('form-title').textContent = '編輯排程';
+        document.getElementById('editing-badge').style.display = 'inline';
+        document.getElementById('btn-cancel-edit').style.display = 'block';
+      }
+      document.getElementById('form-card').style.display = 'block';
+      document.getElementById('form-card').scrollIntoView({ behavior: 'smooth' });
+      alert(`✅ 匯入成功：${data.groups?.length || 0} 個社團`);
+    } catch(err) {
+      alert('匯入失敗：' + err.message);
+    }
+    input.value = '';
+  };
+  reader.readAsText(file);
 }
 
 // ── 時段選擇 ──────────────────────────────────
@@ -785,8 +879,8 @@ async function saveSchedule() {
   const hours = getSelectedHours();
   const weekdays = getSelectedWeekdays();
 
-  if (groups.length === 0 || groups.some(g => !g.group_url)) {
-    alert('請填入至少一個社團網址');
+  if (groups.length === 0) {
+    alert('請填入至少一個社團網址（空白行已自動略過）');
     return;
   }
   if (hours.length === 0) {
@@ -860,8 +954,8 @@ async function runNow() {
   const groups = getGroupConfigs();
   const hours = getSelectedHours();
 
-  if (groups.length === 0 || groups.some(g => !g.group_url)) {
-    alert('請填入至少一個社團網址');
+  if (groups.length === 0) {
+    alert('請填入至少一個社團網址（空白行已自動略過）');
     return;
   }
 
@@ -1068,6 +1162,6 @@ schedulePoll = setInterval(loadSchedules, 30000);
 </script>
 
 
-<div style="text-align:center;padding:24px 0 16px;color:var(--text2);font-size:11px;opacity:0.5">v2026.4.14.0951</div>
+<div style="text-align:center;padding:24px 0 16px;color:var(--text2);font-size:11px;opacity:0.5">v2026.4.14.1632</div>
 </body>
 </html>
