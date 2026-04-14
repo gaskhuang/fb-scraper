@@ -1062,12 +1062,34 @@ function renderSchedules(schedules) {
         <div class="schedule-card-actions">
           <button class="btn-xs primary" onclick="runNowDirect('${s.schedule_id}')">▶ 立即執行</button>
           <button class="btn-xs" onclick="editSchedule('${s.schedule_id}')">✏️ 編輯</button>
+          <button class="btn-xs" onclick="exportScheduleById('${s.schedule_id}')">📤 匯出</button>
           <button class="btn-xs" onclick="toggleSchedule('${s.schedule_id}', ${toggleAction})">${toggleLabel}</button>
           <button class="btn-xs danger" onclick="deleteSchedule('${s.schedule_id}')">🗑 刪除</button>
         </div>
       </div>
     `;
   }).join('');
+}
+
+function exportScheduleById(sid) {
+  const s = window._schedules?.find(x => x.schedule_id === sid);
+  if (!s) return;
+  const payload = {
+    schedule_id: s.schedule_id,
+    name: s.name || '',
+    groups: s.groups || [],
+    hours: s.hours || [],
+    weekdays: s.weekdays || [],
+    max_rounds: s.max_rounds ?? 20,
+    auto_publish: s.auto_publish !== false,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const safeName = (s.name || s.schedule_id.slice(0, 8)).replace(/[^a-zA-Z0-9\u4e00-\u9fff_-]/g, '_');
+  a.download = `schedule_${safeName}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 async function runNowDirect(sid) {
@@ -1162,6 +1184,6 @@ schedulePoll = setInterval(loadSchedules, 30000);
 </script>
 
 
-<div style="text-align:center;padding:24px 0 16px;color:var(--text2);font-size:11px;opacity:0.5">v2026.4.14.1632</div>
+<div style="text-align:center;padding:24px 0 16px;color:var(--text2);font-size:11px;opacity:0.5">v2026.4.14.1640</div>
 </body>
 </html>
